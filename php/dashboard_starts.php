@@ -1,7 +1,7 @@
 <?php
 header("Content-Type: application/json");
 
-require_once "../config/database.php";
+require_once "database.php";
 
 $db = new Database();
 $conn = $db->getConnection();

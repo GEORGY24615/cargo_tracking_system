@@ -9,7 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-require_once "../config/database.php";
+require_once "database.php";
 
 $database = new Database();
 $conn = $database->getConnection();

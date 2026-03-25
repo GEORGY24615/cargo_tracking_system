@@ -205,7 +205,7 @@ html, body {
           <span id="loginBtnText">Sign In</span><div id="loginSpinner" class="loading-spinner hidden"></div>
         </button>
       </form>
-      <p class="text-center text-sm text-gray-600 mt-6">Don't have an account? <a href="#" onclick="showRegisterModal()" class="text-primary font-medium hover:text-secondary">Create one</a></p>
+      <p class="text-center text-sm text-gray-600 mt-6">Don't have an account? <a href="pages/signup.html" class="text-primary font-medium hover:text-secondary">Create one</a></p>
       <p class="text-center text-xs text-gray-500 mt-4">Demo: admin@cargotrack.co.ke / admin123 | staff@cargotrack.co.ke / staff123</p>
     </div>
   </div>
@@ -1944,61 +1944,100 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
   const role = document.getElementById('selectedRole').value;
   const email = document.getElementById('loginEmail').value;
   const password = document.getElementById('loginPassword').value;
-  
+
   if (!role) {
     showNotification('Please select your role', 'error');
     return;
   }
-  
+
   const btnText = document.getElementById('loginBtnText');
   const spinner = document.getElementById('loginSpinner');
   btnText.textContent = 'Logging in...';
   spinner.classList.remove('hidden');
   spinner.style.display = 'inline-block';
-  
+
   try {
+    // Call actual API for login
+    const response = await fetch('php/cargo.php?endpoint=login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify({
+        username: email,
+        password: password
+      })
+    });
+
+    const data = await response.json();
+    console.log('Login response:', data);
+
+    if (data.success) {
+      const user = data.data.user;
+      
+      // Verify role matches
+      if (user.role !== role) {
+        showNotification('Invalid role. Please select ' + user.role, 'error');
+        btnText.textContent = 'Sign In';
+        spinner.classList.add('hidden');
+        return;
+      }
+
+      // Store auth data
+      authToken = data.data.token || 'demo-token';
+      currentUser = {
+        role: user.role,
+        username: user.email,
+        full_name: user.name || user.full_name,
+        email: user.email,
+        id: user.id
+      };
+      
+      localStorage.setItem('authToken', authToken);
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+      
+      closeLoginModal();
+      updateAuthButtons(true, currentUser);
+      showNotification('Welcome, ' + currentUser.full_name + '!', 'success');
+      
+      // Load role-specific data
+      if (role === 'customer') {
+        loadCustomerShipments();
+      } else if (role === 'admin') {
+        loadDashboardStats();
+      }
+      return;
+    }
+
+    showNotification(data.message || 'Invalid credentials', 'error');
+  } catch (error) {
+    console.error('Login error:', error);
+    
+    // Fallback to demo credentials
     if (email === 'admin@cargotrack.co.ke' && password === 'admin123' && role === 'admin') {
       authToken = 'demo-token';
       currentUser = { role: 'admin', username: 'admin', full_name: 'Admin User', email: 'admin@cargotrack.co.ke' };
       localStorage.setItem('authToken', authToken);
       localStorage.setItem('currentUser', JSON.stringify(currentUser));
       closeLoginModal();
-      redirectToDashboard(currentUser.role, currentUser.full_name);
       updateAuthButtons(true, currentUser);
-      showNotification('Welcome, Admin!', 'success');
+      showNotification('Welcome, Admin! (Demo Mode)', 'success');
       return;
     }
-    
+
     if (email === 'staff@cargotrack.co.ke' && password === 'staff123' && role === 'staff') {
       authToken = 'demo-token';
       currentUser = { role: 'staff', username: 'staff', full_name: 'Staff Member', email: 'staff@cargotrack.co.ke' };
       localStorage.setItem('authToken', authToken);
       localStorage.setItem('currentUser', JSON.stringify(currentUser));
       closeLoginModal();
-      redirectToDashboard(currentUser.role, currentUser.full_name);
       updateAuthButtons(true, currentUser);
-      showNotification('Welcome, Staff!', 'success');
+      showNotification('Welcome, Staff! (Demo Mode)', 'success');
       return;
     }
     
-    const registeredCustomers = JSON.parse(localStorage.getItem('customers') || '[]');
-    const customer = registeredCustomers.find(c => c.email === email && c.password === password);
-    if (customer && role === 'customer') {
-      authToken = 'customer-token-' + customer.id;
-      currentUser = { role: 'customer', username: customer.email, full_name: customer.name, email: customer.email };
-      localStorage.setItem('authToken', authToken);
-      localStorage.setItem('currentUser', JSON.stringify(currentUser));
-      closeLoginModal();
-      redirectToDashboard(currentUser.role, currentUser.full_name);
-      updateAuthButtons(true, currentUser);
-      showNotification('Welcome, ' + customer.name + '!', 'success');
-      return;
-    }
-    
-    showNotification('Invalid credentials or role mismatch', 'error');
-  } catch (error) {
-    console.error('Login error:', error);
-    showNotification('Connection error. Please try again.', 'error');
+    showNotification('Connection error. Using demo mode.', 'error');
   } finally {
     btnText.textContent = 'Sign In';
     spinner.classList.add('hidden');
@@ -2006,44 +2045,16 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 });
 
 // ===== REGISTER HANDLER =====
-document.getElementById('registerForm').addEventListener('submit', function(e) {
+// Redirect to signup page instead of using modal
+function showRegisterModal() {
+  window.location.href = 'pages/signup.html';
+}
+
+// Update register form to redirect to signup page
+document.getElementById('registerForm')?.addEventListener('submit', function(e) {
   e.preventDefault();
-  const name = document.getElementById('registerName').value;
-  const email = document.getElementById('registerEmail').value;
-  const phone = document.getElementById('registerPhone').value;
-  const password = document.getElementById('registerPassword').value;
-  
-  if (!name || !email || !password) {
-    showNotification('Please fill in all required fields', 'error');
-    return;
-  }
-  
-  let registeredCustomers = JSON.parse(localStorage.getItem('customers') || '[]');
-  if (registeredCustomers.find(c => c.email === email)) {
-    showNotification('Email already registered. Please login.', 'error');
-    return;
-  }
-  
-  const newCustomer = {
-    id: Date.now(),
-    name: name,
-    email: email,
-    phone: phone,
-    password: password,
-    created_at: new Date().toISOString()
-  };
-  
-  registeredCustomers.push(newCustomer);
-  localStorage.setItem('customers', JSON.stringify(registeredCustomers));
-  
-  showNotification('Account created successfully! Please login.', 'success');
-  closeRegisterModal();
-  openLoginModal();
-  
-  if (document.getElementById('loginEmail')) {
-    document.getElementById('loginEmail').value = email;
-  }
-  selectRole('customer', document.querySelector('[onclick="selectRole(\'customer\', this)"]'));
+  // Redirect to full signup page
+  window.location.href = 'pages/signup.html';
 });
 
 // ===== DATA LOADING FUNCTIONS =====

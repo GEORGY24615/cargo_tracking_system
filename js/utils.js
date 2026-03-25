@@ -2,9 +2,9 @@
 // API Configuration & Helper Functions
 
 const API_CONFIG = {
-    baseURL: window.location.pathname.includes('/public/') 
-        ? '../api/cargo.php' 
-        : 'api/cargo.php',
+    baseURL: window.location.pathname.includes('/pages/')
+        ? '../php/cargo.php'
+        : 'php/cargo.php',
     timeout: 10000
 };
 
